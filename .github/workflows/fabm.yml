@@ -1,0 +1,89 @@
+name: Build and test
+on: push
+jobs:
+   gfortran:
+      strategy:
+         matrix:
+            version: [7, 8, 9, 10, 11]
+            os: [ubuntu-latest]
+            include:
+               - version: 4.8
+                 os: ubuntu-18.04
+                 cmake_args: -DFABM_USE_IEEE_ARITHMETIC=OFF
+               - version: 5
+                 os: ubuntu-18.04
+               - version: 6
+                 os: ubuntu-18.04
+               - version: 8
+                 cmake_args: -DFABM_USE_CONTIGUOUS=OFF
+         fail-fast: false
+      runs-on: ${{ matrix.os }}
+      steps:
+      - name: Install dependencies
+        run: sudo apt-get install gfortran-${{ matrix.version }} python3-numpy python3-setuptools python3-wheel
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Run all test cases with host emulators
+        run: python3 util/developers/run_all_testcases.py harness --show_logs --compiler gfortran-${{ matrix.version }} ${{ matrix.cmake_args }}
+      - name: Run all test cases with pyfabm
+        run: python3 util/developers/run_all_testcases.py pyfabm --show_logs --compiler gfortran-${{ matrix.version }} ${{ matrix.cmake_args }}
+   ifort:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Install compiler
+        run: |
+           wget --no-verbose https://registrationcenter-download.intel.com/akdlm/irc_nas/17508/l_fortran-compiler_p_2021.1.2.62_offline.sh
+           /bin/sh l_fortran-compiler_p_2021.1.2.62_offline.sh -a --silent --cli --install-dir ${HOME}/intel --eula accept
+      - name: Install dependencies
+        run: sudo apt-get install python3-numpy python3-wheel
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Run all test cases with host emulators
+        run: |
+           source ${HOME}/intel/setvars.sh
+           python3 util/developers/run_all_testcases.py harness --show_logs --compiler ifort
+      - name: Run all test cases with pyfabm
+        run: |
+           source ${HOME}/intel/setvars.sh
+           python3 util/developers/run_all_testcases.py pyfabm --show_logs --compiler ifort
+   nvfortran:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Install compiler
+        run: |
+           wget --no-verbose https://developer.download.nvidia.com/hpc-sdk/20.9/nvhpc_2020_209_Linux_x86_64_cuda_11.0.tar.gz
+           tar xpzf nvhpc_2020_209_Linux_x86_64_cuda_11.0.tar.gz
+           nvhpc_2020_209_Linux_x86_64_cuda_11.0/install
+        env:
+           NVHPC_SILENT: true
+           NVHPC_INSTALL_DIR: /home/runner/nvhpc
+           NVHPC_INSTALL_TYPE: single
+      - name: Install dependencies
+        run: sudo apt-get install python3-numpy python3-wheel
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Run all test cases with host emulators
+        run: python3 util/developers/run_all_testcases.py harness --show_logs --compiler /home/runner/nvhpc/Linux_x86_64/20.9/compilers/bin/pgfortran
+      - name: Run all test cases with pyfabm
+        run: python3 util/developers/run_all_testcases.py pyfabm --show_logs --compiler /home/runner/nvhpc/Linux_x86_64/20.9/compilers/bin/pgfortran
+   aocc:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Install compiler
+        run: |
+           cd /home/runner
+           wget --no-verbose http://developer.amd.com/wordpress/media/files/aocc-compiler-3.0.0.tar
+           tar xpf aocc-compiler-3.0.0.tar
+           ./aocc-compiler-3.0.0/install.sh
+      - name: Install dependencies
+        run: sudo apt-get install python3-numpy python3-wheel
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Run all test cases with host emulators
+        run: |
+           source /home/runner/setenv_AOCC.sh
+           python3 util/developers/run_all_testcases.py harness --show_logs --compiler flang
+      - name: Run all test cases with pyfabm
+        run: |
+           source /home/runner/setenv_AOCC.sh
+           python3 util/developers/run_all_testcases.py pyfabm --show_logs --compiler flang
